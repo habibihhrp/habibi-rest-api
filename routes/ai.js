@@ -59,10 +59,30 @@ router.get(
 );
 
 // ===== /api/ai/gemini =====
-// Google Gemini (free tier ~60 req/min). Set GEMINI_API_KEY in env.
+// Google Gemini (free tier dengan model + quota terpisah). Set GEMINI_API_KEY di env.
 // Daftar gratis di https://aistudio.google.com/app/apikey
+//
+// Free-tier quota di Google AI Studio dihitung *per model*, jadi kita pakai chain
+// fallback: kalau model utama 429 (quota exceeded), otomatis switch ke model lain
+// yang masih ada quota.
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_FALLBACK_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-2.0-flash-lite",
+];
+
+const callGemini = async (model, prompt) => {
+  const r = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+    { contents: [{ parts: [{ text: prompt }] }] },
+    { headers: { "Content-Type": "application/json" }, timeout: 30000 },
+  );
+  return r.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+};
+
 router.get(
   "/gemini",
   apikeyAuth,
@@ -72,15 +92,25 @@ router.get(
     }
     const prompt = String(req.query.prompt || "").trim();
     if (!prompt) return fail(res, 400, "Missing ?prompt=");
-    const model = String(req.query.model || "").trim() || GEMINI_MODEL;
-    const r = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-      { contents: [{ parts: [{ text: prompt }] }] },
-      { headers: { "Content-Type": "application/json" }, timeout: 30000 },
-    );
-    const answer = r.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    logSuccess(req);
-    return ok(res, { model, answer });
+    const userModel = String(req.query.model || "").trim();
+    const tried = [];
+    const chain = userModel ? [userModel] : [GEMINI_MODEL, ...GEMINI_FALLBACK_MODELS.filter((m) => m !== GEMINI_MODEL)];
+    let lastErr = null;
+    for (const m of chain) {
+      try {
+        const answer = await callGemini(m, prompt);
+        logSuccess(req);
+        return ok(res, { model: m, answer, tried });
+      } catch (e) {
+        const status = e?.response?.status;
+        const msg = e?.response?.data?.error?.message || e?.message || "unknown";
+        tried.push({ model: m, status, error: msg.slice(0, 200) });
+        lastErr = { status, msg };
+        // Fall through on quota/availability errors; everything else is fatal.
+        if (![429, 404, 503, 500].includes(status)) break;
+      }
+    }
+    return fail(res, lastErr?.status === 429 ? 429 : 502, `Gemini upstream error: ${lastErr?.msg || "unknown"}`, { tried });
   }),
 );
 

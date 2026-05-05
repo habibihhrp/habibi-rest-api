@@ -104,39 +104,78 @@ router.get(
   }),
 );
 
-// ===== YouTube via savetube.me =====
-const ytScraper = async (url) => {
-  // Minimal info via youtube oEmbed (no scrape needed for metadata)
-  const meta = await axios
-    .get(
-      `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`,
-      { timeout: 10000 },
-    )
-    .catch(() => ({ data: {} }));
+// ===== YouTube downloader via Piped public instances =====
+// Piped is a privacy-focused YouTube frontend that exposes a JSON API with direct
+// (CDN-proxied) audio/video stream URLs. Cobalt v7 was the previous backend but
+// shut down 2024-11-11 — Piped is the current working alternative.
+//
+// We try a list of known-good public Piped instances in order until one returns 200.
+// You can override with PIPED_API_URL env var (set on Vercel). To self-host see
+// https://github.com/TeamPiped/Piped.
+const PIPED_INSTANCES = [
+  process.env.PIPED_API_URL,
+  "https://api.piped.private.coffee",
+  "https://pipedapi.kavin.rocks",
+  "https://pipedapi.adminforge.de",
+].filter(Boolean);
 
-  // Direct mp4/mp3 stream — use cobalt.tools public instance.
-  // Cobalt is open-source and has documented API.
-  const cobalt = await axios.post(
-    "https://api.cobalt.tools/api/json",
-    { url, vCodec: "h264", vQuality: "720", filenamePattern: "basic" },
-    {
-      headers: {
-        "User-Agent": UA,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      timeout: 30000,
-    },
-  );
-  if (!["stream", "redirect", "tunnel"].includes(cobalt.data?.status)) {
-    throw new Error(cobalt.data?.text || "YouTube scrape failed");
+const extractYtVideoId = (url) => {
+  const m =
+    /(?:v=|\/shorts\/|youtu\.be\/|\/embed\/)([A-Za-z0-9_-]{11})/.exec(url) ||
+    /^([A-Za-z0-9_-]{11})$/.exec(url);
+  return m ? m[1] : null;
+};
+
+const pipedFetch = async (path) => {
+  let lastErr = null;
+  for (const base of PIPED_INSTANCES) {
+    try {
+      const r = await axios.get(`${base}${path}`, {
+        headers: { "User-Agent": UA, Accept: "application/json" },
+        timeout: 20000,
+        maxRedirects: 3,
+      });
+      if (r.data && typeof r.data === "object") return r.data;
+      lastErr = new Error("Non-JSON response from " + base);
+    } catch (e) {
+      lastErr = e;
+    }
   }
+  throw lastErr || new Error("All Piped instances unreachable");
+};
+
+const pickBestAudio = (streams = []) =>
+  [...streams].sort((a, b) => (a.bitrate || 0) - (b.bitrate || 0)).pop();
+const pickVideoByQuality = (streams = [], wantQ) => {
+  if (!streams.length) return null;
+  const exact = streams.find((s) => s.quality === wantQ + "p" && s.format === "MPEG_4");
+  if (exact) return exact;
+  const mp4 = streams.filter((s) => s.format === "MPEG_4");
+  if (mp4.length) {
+    return mp4.sort((a, b) => parseInt(a.quality) - parseInt(b.quality)).pop();
+  }
+  return streams[0];
+};
+
+const ytScraper = async (url) => {
+  const id = extractYtVideoId(url);
+  if (!id) throw new Error("Invalid YouTube URL or video id");
+  const data = await pipedFetch(`/streams/${id}`);
+  const audio = pickBestAudio(data.audioStreams);
+  const video = pickVideoByQuality(data.videoStreams, "720");
   return {
-    title: meta.data.title || null,
-    author: meta.data.author_name || null,
-    thumbnail: meta.data.thumbnail_url || null,
-    download_url: cobalt.data.url,
-    type: cobalt.data.status,
+    videoId: id,
+    title: data.title || null,
+    author: data.uploader || null,
+    duration: data.duration || null,
+    views: data.views || null,
+    thumbnail: data.thumbnailUrl || null,
+    audio_url: audio?.url || null,
+    audio_bitrate: audio?.bitrate || null,
+    audio_mime: audio?.mimeType || null,
+    video_url: video?.url || null,
+    video_quality: video?.quality || null,
+    video_mime: video?.mimeType || null,
   };
 };
 
@@ -152,8 +191,6 @@ router.get(
   }),
 );
 
-// ===== YouTube MP4 (explicit) =====
-// Same as /youtube but allows quality override via ?quality=720|480|360
 router.get(
   "/ytmp4",
   apikeyAuth,
@@ -164,54 +201,46 @@ router.get(
     if (!["144", "240", "360", "480", "720", "1080"].includes(quality)) {
       return fail(res, 400, "quality must be 144|240|360|480|720|1080");
     }
-    const meta = await axios
-      .get(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`, { timeout: 10000 })
-      .catch(() => ({ data: {} }));
-    const cobalt = await axios.post(
-      "https://api.cobalt.tools/api/json",
-      { url, vCodec: "h264", vQuality: quality, filenamePattern: "basic" },
-      { headers: { "User-Agent": UA, "Content-Type": "application/json", Accept: "application/json" }, timeout: 30000 },
-    );
-    if (!["stream", "redirect", "tunnel"].includes(cobalt.data?.status)) {
-      return fail(res, 502, cobalt.data?.text || "ytmp4 upstream failed");
-    }
+    const id = extractYtVideoId(url);
+    if (!id) return fail(res, 400, "Invalid YouTube URL or video id");
+    const data = await pipedFetch(`/streams/${id}`);
+    const video = pickVideoByQuality(data.videoStreams, quality);
+    if (!video?.url) return fail(res, 502, "No mp4 stream available for this video");
     logSuccess(req);
     return ok(res, {
-      title: meta.data.title || null,
-      author: meta.data.author_name || null,
-      thumbnail: meta.data.thumbnail_url || null,
-      quality,
+      videoId: id,
+      title: data.title || null,
+      author: data.uploader || null,
+      thumbnail: data.thumbnailUrl || null,
+      quality: video.quality,
       format: "mp4",
-      download_url: cobalt.data.url,
+      mime: video.mimeType,
+      download_url: video.url,
     });
   }),
 );
 
-// ===== YouTube MP3 (audio only) =====
 router.get(
   "/ytmp3",
   apikeyAuth,
   tryCatch(async (req, res) => {
     const url = String(req.query.url || "").trim();
     if (!url) return fail(res, 400, "Missing ?url=");
-    const meta = await axios
-      .get(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`, { timeout: 10000 })
-      .catch(() => ({ data: {} }));
-    const cobalt = await axios.post(
-      "https://api.cobalt.tools/api/json",
-      { url, isAudioOnly: true, aFormat: "mp3", filenamePattern: "basic" },
-      { headers: { "User-Agent": UA, "Content-Type": "application/json", Accept: "application/json" }, timeout: 30000 },
-    );
-    if (!["stream", "redirect", "tunnel"].includes(cobalt.data?.status)) {
-      return fail(res, 502, cobalt.data?.text || "ytmp3 upstream failed");
-    }
+    const id = extractYtVideoId(url);
+    if (!id) return fail(res, 400, "Invalid YouTube URL or video id");
+    const data = await pipedFetch(`/streams/${id}`);
+    const audio = pickBestAudio(data.audioStreams);
+    if (!audio?.url) return fail(res, 502, "No audio stream available for this video");
     logSuccess(req);
     return ok(res, {
-      title: meta.data.title || null,
-      author: meta.data.author_name || null,
-      thumbnail: meta.data.thumbnail_url || null,
+      videoId: id,
+      title: data.title || null,
+      author: data.uploader || null,
+      thumbnail: data.thumbnailUrl || null,
       format: "mp3",
-      download_url: cobalt.data.url,
+      bitrate: audio.bitrate,
+      mime: audio.mimeType,
+      download_url: audio.url,
     });
   }),
 );
@@ -400,28 +429,24 @@ router.get(
     const results = await ytSearch(q);
     if (!results.length) return fail(res, 404, "No video found for query");
     const top = results[0];
-    let download_url = null;
-    let cobaltErr = null;
+    let audio_url = null;
+    let video_url = null;
+    let bitrate = null;
+    let dlErr = null;
     try {
-      const cobalt = await axios.post(
-        "https://api.cobalt.tools/api/json",
-        { url: top.url, isAudioOnly: true, aFormat: "mp3", filenamePattern: "basic" },
-        {
-          headers: {
-            "User-Agent": UA,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          timeout: 30000,
-        },
-      );
-      if (["stream", "redirect", "tunnel"].includes(cobalt.data?.status)) {
-        download_url = cobalt.data.url;
-      } else {
-        cobaltErr = cobalt.data?.text || "cobalt status: " + cobalt.data?.status;
+      const data = await pipedFetch(`/streams/${top.videoId}`);
+      const audio = pickBestAudio(data.audioStreams);
+      const video = pickVideoByQuality(data.videoStreams, "720");
+      if (audio?.url) {
+        audio_url = audio.url;
+        bitrate = audio.bitrate;
       }
+      if (video?.url) {
+        video_url = video.url;
+      }
+      if (!audio_url) dlErr = "No audio stream returned by Piped";
     } catch (e) {
-      cobaltErr = e.message;
+      dlErr = e?.response?.data?.message || e?.message || "Piped fetch failed";
     }
     logSuccess(req);
     return ok(res, {
@@ -429,8 +454,11 @@ router.get(
       result: {
         ...top,
         format: "mp3",
-        download_url,
-        download_error: download_url ? null : cobaltErr,
+        audio_url,
+        video_url,
+        bitrate,
+        download_url: audio_url,
+        download_error: audio_url ? null : dlErr,
       },
       related: results.slice(1, 6),
     });

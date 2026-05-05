@@ -227,6 +227,7 @@ curl -H "X-API-Key: YOUR_KEY" "https://api.kamu.com/api/random/quote"</code></pr
         desc: "Strong random password generator." },
       { cat: "Tools", emoji: "🛠️", path: "/api/tools/iqc",
         params: [{n:"text",req:true,desc:"Isi pesan (max 200 char)",ex:"halo"},
+                 {n:"format",req:false,desc:"png|svg (default png)",ex:"png"},
                  {n:"operator",req:false,desc:"Telkomsel|XL|Indosat|Smartfren (default Telkomsel)",ex:"XL"},
                  {n:"network",req:false,desc:"LTE|4G|5G|3G (default LTE)",ex:"5G"},
                  {n:"time",req:false,desc:"Jam status bar (default 07.58)",ex:"21.30"},
@@ -234,7 +235,7 @@ curl -H "X-API-Key: YOUR_KEY" "https://api.kamu.com/api/random/quote"</code></pr
                  {n:"signal",req:false,desc:"Bars 0-4 (default 4)",ex:"3"},
                  {n:"wifi",req:false,desc:"on|off (default on)",ex:"on"},
                  {n:"wifiBars",req:false,desc:"0-3 (default 3)",ex:"2"}],
-        desc: "IQC Generator — iOS WhatsApp long-press template (status bar + reaction bar 👍❤️😂😮😢🙏 + action sheet Beri Bintang/Balas/Teruskan/Salin/Ucapkan/Laporkan/Hapus). Output image/svg+xml." },
+        desc: "IQC Generator — iOS WhatsApp long-press template (status bar + reaction bar 👍❤️😂😮😢🙏 + action sheet Beri Bintang/Balas/Teruskan/Salin/Ucapkan/Laporkan/Hapus). Output image/png (default, di-render via resvg dengan twemoji). Pass ?format=svg buat raw SVG." },
 
       // ===== Search =====
       { cat: "Search", emoji: "🔍", path: "/api/search/github",

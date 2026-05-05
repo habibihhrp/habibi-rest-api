@@ -2,11 +2,37 @@
 import express from "express";
 import axios from "axios";
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import QRCode from "qrcode";
+import { Resvg } from "@resvg/resvg-js";
 import { apikeyAuth, logSuccess } from "../lib/auth.js";
 import { ok, fail, tryCatch } from "../lib/respond.js";
 
 const router = express.Router();
+
+// Load twemoji PNG sprites (for IQC reaction bar). Run once at startup, cache base64
+// data URIs in memory. PNGs were committed to assets/twemoji/ at install time so we
+// don't depend on outbound CDN at request time (and Vercel functions can read repo files).
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const TWEMOJI_DIR = path.join(__dirname, "..", "assets", "twemoji");
+const loadEmojiDataUri = (filename) => {
+  try {
+    const buf = fs.readFileSync(path.join(TWEMOJI_DIR, filename));
+    return `data:image/png;base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
+};
+const EMOJI = {
+  thumbs: loadEmojiDataUri("1f44d.png"),
+  heart: loadEmojiDataUri("2764.png"),
+  laugh: loadEmojiDataUri("1f602.png"),
+  surprise: loadEmojiDataUri("1f62e.png"),
+  cry: loadEmojiDataUri("1f622.png"),
+  pray: loadEmojiDataUri("1f64f.png"),
+};
 const UA =
   process.env.SCRAPER_UA ||
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -340,18 +366,19 @@ router.get(
     const signal = Math.min(4, Math.max(0, parseInt(req.query.signal || "4", 10) || 4));
     const wifi = String(req.query.wifi || "on").toLowerCase() !== "off";
     const wifiBars = Math.min(3, Math.max(0, parseInt(req.query.wifiBars || "3", 10) || 3));
+    const format = String(req.query.format || "png").toLowerCase() === "svg" ? "svg" : "png";
 
     const W = 720;
-    const padX = 24;
-    const statusBarH = 60;
+    const padX = 28;
+    const statusBarH = 70;
 
-    // Status bar pieces (left: signal bars + operator + network; center: time; right: wifi + battery)
+    // Status bar pieces. Layout: [signal bars] [operator] [network]   [time]   [wifi] [battery%] [batt icon]
     const signalSvg = (() => {
       let s = "";
       for (let i = 0; i < 4; i++) {
         const filled = i < signal;
         const h = 6 + i * 4;
-        const y = 26 - h;
+        const y = 38 - h;
         s += `<rect x="${padX + i * 8}" y="${y}" width="5" height="${h}" rx="1" fill="${filled ? "#fff" : "#666"}"/>`;
       }
       return s;
@@ -359,8 +386,8 @@ router.get(
 
     const wifiSvg = (() => {
       if (!wifi) return "";
-      const cx = W - 130;
-      const cy = 30;
+      const cx = W - 145;
+      const cy = 36;
       const arc = (r, color) =>
         `<path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" stroke="${color}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
       return [
@@ -371,43 +398,49 @@ router.get(
       ].join("");
     })();
 
-    // Battery: percentage + box
-    const battColor = battery <= 20 ? "#f5a300" : battery <= 10 ? "#ff3b30" : "#fff";
+    // Battery: percentage text + box icon
+    const battColor = battery <= 10 ? "#ff3b30" : battery <= 20 ? "#f5a300" : "#fff";
     const battFillW = (battery / 100) * 32;
     const batterySvg = `
-      <text x="${W - 100}" y="38" font-size="20" fill="#fff" font-family="-apple-system, 'SF Pro Text', sans-serif" font-weight="500">${battery}%</text>
-      <g transform="translate(${W - 60}, 22)">
+      <text x="${W - 110}" y="44" font-size="22" fill="#fff" font-family="-apple-system, 'SF Pro Text', sans-serif" font-weight="500">${battery}%</text>
+      <g transform="translate(${W - 60}, 28)">
         <rect x="0" y="0" width="36" height="16" rx="4" ry="4" fill="none" stroke="${battColor}" stroke-width="1.5"/>
         <rect x="36.5" y="5" width="2.5" height="6" rx="1" fill="${battColor}"/>
         <rect x="2" y="2" width="${battFillW}" height="12" rx="2" fill="${battColor}"/>
       </g>`;
 
-    // Reaction bar pill — 6 emojis
-    const reactions = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
-    const reactX = padX + 30;
-    const reactY = 360;
-    const reactW = 480;
-    const reactH = 64;
+    // Reaction bar pill — 6 emojis. Use twemoji PNGs embedded as base64 data URIs so resvg
+    // can render them properly server-side (system fonts can't render color emoji on Linux).
+    const reactions = [EMOJI.thumbs, EMOJI.heart, EMOJI.laugh, EMOJI.surprise, EMOJI.cry, EMOJI.pray];
+    const reactX = padX + 20;
+    const reactY = 380;
+    const reactW = 540;
+    const reactH = 76;
+    const emojiSize = 44;
     const reactStep = reactW / reactions.length;
     const reactionSvg =
-      `<rect x="${reactX}" y="${reactY}" width="${reactW}" height="${reactH}" rx="32" fill="#2a2a2a" fill-opacity="0.92"/>` +
+      `<rect x="${reactX}" y="${reactY}" width="${reactW}" height="${reactH}" rx="38" fill="#2a2a2a" fill-opacity="0.95"/>` +
       reactions
-        .map((e, i) => `<text x="${reactX + i * reactStep + reactStep / 2}" y="${reactY + 44}" font-size="32" text-anchor="middle" font-family="'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif">${e}</text>`)
+        .map((src, i) => {
+          if (!src) return "";
+          const cx = reactX + i * reactStep + reactStep / 2;
+          return `<image href="${src}" x="${cx - emojiSize / 2}" y="${reactY + (reactH - emojiSize) / 2}" width="${emojiSize}" height="${emojiSize}"/>`;
+        })
         .join("");
 
     // Quoted message bubble (the user's text, small grey bubble like WhatsApp)
     const bubbleX = padX + 16;
-    const bubbleY = 460;
+    const bubbleY = 490;
     const charW = 14;
-    const minBubbleW = 110;
-    const maxBubbleW = 380;
-    const textWidth = Math.min(maxBubbleW, Math.max(minBubbleW, text.length * charW + 32));
-    const bubbleH = 70;
+    const minBubbleW = 120;
+    const maxBubbleW = 420;
+    const textWidth = Math.min(maxBubbleW, Math.max(minBubbleW, text.length * charW + 36));
+    const bubbleH = 80;
     const quotedBubbleSvg = `
       <g>
-        <rect x="${bubbleX}" y="${bubbleY}" width="${textWidth}" height="${bubbleH}" rx="14" fill="#2a2a2a" fill-opacity="0.95"/>
-        <text x="${bubbleX + 16}" y="${bubbleY + 32}" font-size="22" fill="#fff" font-family="-apple-system, 'SF Pro Text', sans-serif">${escapeXml(text)}</text>
-        <text x="${bubbleX + 16}" y="${bubbleY + 56}" font-size="14" fill="#9aa0a6" font-family="-apple-system, sans-serif">${escapeXml(time)}</text>
+        <rect x="${bubbleX}" y="${bubbleY}" width="${textWidth}" height="${bubbleH}" rx="16" fill="#2a2a2a" fill-opacity="0.96"/>
+        <text x="${bubbleX + 18}" y="${bubbleY + 38}" font-size="26" fill="#fff" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif" font-weight="500">${escapeXml(text)}</text>
+        <text x="${bubbleX + 18}" y="${bubbleY + 64}" font-size="15" fill="#9aa0a6" font-family="-apple-system, sans-serif">${escapeXml(time)}</text>
       </g>`;
 
     // Action sheet: 7 rows, white text + right-side icon, separators
@@ -421,9 +454,9 @@ router.get(
       { label: "Hapus", icon: "trash", danger: true },
     ];
     const sheetX = padX;
-    const sheetY = 560;
-    const sheetW = 480;
-    const rowH = 64;
+    const sheetY = 600;
+    const sheetW = 540;
+    const rowH = 70;
     const sheetH = actions.length * rowH;
 
     const iconSvg = (icon, x, y, color) => {
@@ -498,7 +531,14 @@ router.get(
         <circle cx="60" cy="115" r="22" fill="#9aa0a6"/>
       </g>`;
 
-    const H = sheetY + sheetH + 40;
+    const H = sheetY + sheetH + 50;
+
+    // Operator label x-position is dynamic (after signal bars), and the network token sits
+    // after the operator with a fixed gap. Using char-width estimate is good enough at 22px.
+    const opX = padX + 4 * 8 + 14;
+    const opCharW = 12;
+    const opEnd = opX + operator.length * opCharW;
+    const networkX = opEnd + 12;
 
     const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -506,13 +546,13 @@ router.get(
   <rect width="100%" height="100%" fill="#000"/>
   ${bgBlurSvg}
   <!-- semi-transparent dim over background -->
-  <rect x="0" y="${statusBarH + 10}" width="${W}" height="${H - statusBarH - 10}" fill="#000" fill-opacity="0.55"/>
+  <rect x="0" y="${statusBarH + 10}" width="${W}" height="${H - statusBarH - 10}" fill="#000" fill-opacity="0.6"/>
   <!-- ===== status bar ===== -->
   <g font-family="-apple-system, 'SF Pro Text', sans-serif">
     ${signalSvg}
-    <text x="${padX + 38}" y="38" font-size="20" fill="#fff" font-weight="600">${escapeXml(operator)}</text>
-    <text x="${padX + 38 + (operator.length * 11) + 14}" y="38" font-size="20" fill="#fff" font-weight="500">${escapeXml(network)}</text>
-    <text x="${W / 2}" y="38" font-size="22" fill="#fff" font-weight="600" text-anchor="middle">${escapeXml(time)}</text>
+    <text x="${opX}" y="44" font-size="22" fill="#fff" font-weight="600">${escapeXml(operator)}</text>
+    <text x="${networkX}" y="44" font-size="22" fill="#fff" font-weight="500">${escapeXml(network)}</text>
+    <text x="${W / 2}" y="44" font-size="24" fill="#fff" font-weight="600" text-anchor="middle">${escapeXml(time)}</text>
     ${wifiSvg}
     ${batterySvg}
   </g>
@@ -522,14 +562,22 @@ router.get(
   ${quotedBubbleSvg}
   <!-- action sheet -->
   <g>
-    <rect x="${sheetX}" y="${sheetY}" width="${sheetW}" height="${sheetH}" rx="20" fill="#1c1c1e" fill-opacity="0.96"/>
+    <rect x="${sheetX}" y="${sheetY}" width="${sheetW}" height="${sheetH}" rx="22" fill="#1c1c1e" fill-opacity="0.96"/>
     ${sheetRowsSvg}
   </g>
 </svg>`;
+
     logSuccess(req);
-    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+    if (format === "svg") {
+      res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=300");
+      return res.send(svg);
+    }
+    // Render to PNG via resvg (Rust-based, fast, no system dep on Vercel).
+    const png = new Resvg(svg, { background: "#000" }).render().asPng();
+    res.setHeader("Content-Type", "image/png");
     res.setHeader("Cache-Control", "public, max-age=300");
-    return res.send(svg);
+    return res.send(png);
   }),
 );
 
