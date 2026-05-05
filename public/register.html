@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daftar — Habibi API</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="flex items-center justify-center min-h-screen px-4">
+  <div class="glass w-full max-w-md p-8 rounded-2xl">
+    <a href="/" class="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+      ⚡ Habibi API
+    </a>
+    <h1 class="text-2xl font-bold mt-4 mb-1">Buat Akun</h1>
+    <p class="text-sm text-slate-400 mb-6">Gratis. Langsung dapet apikey 100 req/hari.</p>
+
+    <form id="registerForm" class="space-y-4">
+      <div>
+        <label class="block text-sm mb-1">Username</label>
+        <input class="input w-full px-3 py-2 rounded-lg" name="username" required minlength="3" maxlength="32" pattern="[a-zA-Z0-9_]+" placeholder="habibi" />
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Email</label>
+        <input class="input w-full px-3 py-2 rounded-lg" name="email" type="email" required placeholder="kamu@email.com" />
+      </div>
+      <div>
+        <label class="block text-sm mb-1">Password</label>
+        <input class="input w-full px-3 py-2 rounded-lg" name="password" type="password" required minlength="6" placeholder="min 6 karakter" />
+      </div>
+      <button type="submit" id="submitBtn" class="btn w-full px-4 py-2.5 rounded-lg font-medium text-white">
+        Daftar
+      </button>
+    </form>
+
+    <p class="text-sm text-center text-slate-400 mt-4">
+      Udah punya akun? <a href="/login.html" class="text-indigo-400 hover:text-indigo-300">Login</a>
+    </p>
+  </div>
+
+  <script type="module">
+    import { api, toast, redirectIfLoggedIn } from "/js/app.js";
+    redirectIfLoggedIn();
+
+    const form = document.getElementById("registerForm");
+    const btn = document.getElementById("submitBtn");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      btn.disabled = true; btn.textContent = "Loading...";
+      const fd = new FormData(form);
+      try {
+        const r = await api.post("/api/auth/register", {
+          username: fd.get("username"),
+          email: fd.get("email"),
+          password: fd.get("password"),
+        });
+        api.setToken(r.result.token);
+        toast("Registrasi sukses! Mengarah ke dashboard...", "success");
+        setTimeout(() => (location.href = "/dashboard.html"), 1000);
+      } catch (err) {
+        toast(err.message, "error");
+        btn.disabled = false; btn.textContent = "Daftar";
+      }
+    });
+  </script>
+</body>
+</html>

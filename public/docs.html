@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Docs — Habibi API</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="glass sticky top-0 z-40 border-b border-slate-700/50">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+        ⚡ Habibi API
+      </a>
+      <div class="flex gap-2 items-center">
+        <a href="/docs.html" class="px-3 py-2 text-sm text-white">Docs</a>
+        <a href="/dashboard.html" class="px-3 py-2 text-sm text-slate-300 hover:text-white">Dashboard</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-4xl mx-auto px-4 py-8 space-y-6">
+    <div>
+      <h1 class="text-3xl font-bold mb-2">Dokumentasi API</h1>
+      <p class="text-slate-400">Daftar lengkap endpoint, parameter, dan contoh response.</p>
+    </div>
+
+    <!-- Authentication -->
+    <section class="glass rounded-xl p-6">
+      <h2 class="text-xl font-bold mb-3">🔐 Authentication</h2>
+      <p class="text-slate-300 mb-3">Pakai apikey kamu di setiap request. Dua cara:</p>
+      <pre class="bg-slate-900/50 p-3 rounded text-xs overflow-x-auto mono"><code># Sebagai query parameter
+curl "https://api.kamu.com/api/random/quote?apikey=YOUR_KEY"
+
+# Atau sebagai header
+curl -H "X-API-Key: YOUR_KEY" "https://api.kamu.com/api/random/quote"</code></pre>
+      <p class="text-sm text-slate-400 mt-3">Limit: <strong>100 request/hari</strong> (free) atau <strong>unlimited</strong> (premium). Reset 00:00 WIB.</p>
+    </section>
+
+    <!-- Response format -->
+    <section class="glass rounded-xl p-6">
+      <h2 class="text-xl font-bold mb-3">📦 Response Format</h2>
+      <div class="grid md:grid-cols-2 gap-3">
+        <div>
+          <h3 class="text-sm font-bold mb-1 text-emerald-400">Success</h3>
+          <pre class="bg-slate-900/50 p-3 rounded text-xs mono"><code>{
+  "status": true,
+  "code": 200,
+  "result": { /* data */ }
+}</code></pre>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold mb-1 text-red-400">Error</h3>
+          <pre class="bg-slate-900/50 p-3 rounded text-xs mono"><code>{
+  "status": false,
+  "code": 401,
+  "message": "Invalid API key."
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Endpoints -->
+    <section>
+      <h2 class="text-2xl font-bold mb-4">📡 Endpoints</h2>
+      <div id="endpoints" class="space-y-3"></div>
+    </section>
+  </main>
+
+  <script>
+    const ENDPOINTS = [
+      // Downloader
+      { method: "GET", path: "/api/downloader/tiktok", category: "Downloader",
+        params: [{name: "url", required: true, desc: "TikTok video URL"}],
+        example: "https://www.tiktok.com/@user/video/123",
+        desc: "Download TikTok video tanpa watermark. Returns mp4 URL + metadata." },
+      { method: "GET", path: "/api/downloader/instagram", category: "Downloader",
+        params: [{name: "url", required: true, desc: "IG post/reel URL"}],
+        example: "https://www.instagram.com/reel/...",
+        desc: "Download Instagram post/reel/story." },
+      { method: "GET", path: "/api/downloader/youtube", category: "Downloader",
+        params: [{name: "url", required: true, desc: "YouTube video URL"}],
+        example: "https://youtu.be/dQw4w9WgXcQ",
+        desc: "Download YouTube video (mp4, 720p)." },
+      // Tools
+      { method: "GET", path: "/api/tools/brat", category: "Tools",
+        params: [{name: "text", required: true, desc: "Teks (max 200 chars)"}],
+        example: "habibi forever",
+        desc: "Generate Brat-style sticker. Returns PNG image (binary)." },
+      { method: "GET", path: "/api/tools/ssweb", category: "Tools",
+        params: [{name: "url", required: true, desc: "URL website (must start http://)"}],
+        example: "https://github.com",
+        desc: "Screenshot website. Returns JPEG image." },
+      { method: "GET", path: "/api/tools/qrcode", category: "Tools",
+        params: [{name: "text", required: true, desc: "Teks/URL untuk encode"}],
+        example: "https://habibi.com",
+        desc: "Generate QR code 512x512. Returns PNG image." },
+      // Search
+      { method: "GET", path: "/api/search/github", category: "Search",
+        params: [{name: "q", required: true, desc: "Search query"}],
+        example: "express middleware",
+        desc: "Search GitHub repositories. Returns top 10 by stars." },
+      { method: "GET", path: "/api/search/wikipedia", category: "Search",
+        params: [{name: "q", required: true, desc: "Article title"}, {name: "lang", required: false, desc: "Language code (default: id)"}],
+        example: "Indonesia",
+        desc: "Get Wikipedia summary." },
+      // AI
+      { method: "GET", path: "/api/ai/chat", category: "AI",
+        params: [
+          {name: "prompt", required: true, desc: "User prompt"},
+          {name: "system", required: false, desc: "System prompt (override)"},
+          {name: "model", required: false, desc: "Groq model (default: llama-3.3-70b)"},
+        ],
+        example: "Apa itu REST API?",
+        desc: "AI chat completion via Groq (Llama 3.3 70B). Free tier." },
+      // Random
+      { method: "GET", path: "/api/random/quote", category: "Random",
+        params: [], desc: "Random quote bahasa Indonesia." },
+      { method: "GET", path: "/api/random/waifu", category: "Random",
+        params: [{name: "category", required: false, desc: "waifu | neko | hug | kiss | etc"}],
+        example: "neko",
+        desc: "Random anime image (SFW)." },
+      { method: "GET", path: "/api/random/fact", category: "Random",
+        params: [], desc: "Random useless fact (English)." },
+    ];
+
+    const grouped = {};
+    for (const e of ENDPOINTS) {
+      grouped[e.category] = grouped[e.category] || [];
+      grouped[e.category].push(e);
+    }
+
+    const container = document.getElementById("endpoints");
+    for (const [cat, items] of Object.entries(grouped)) {
+      const heading = document.createElement("h3");
+      heading.className = "text-lg font-bold mt-6 mb-2 text-indigo-300";
+      heading.textContent = cat;
+      container.appendChild(heading);
+
+      for (const e of items) {
+        const card = document.createElement("div");
+        card.className = "endpoint-card glass rounded-xl p-4 border border-slate-700/50";
+        const exampleUrl = e.path + (e.params.length ? `?${e.params.filter(p => p.required || p.name === 'url' || p.name === 'text' || p.name === 'q' || p.name === 'prompt').map(p => `${p.name}=${encodeURIComponent(e.example || '')}`).join("&")}&apikey=YOUR_KEY` : "?apikey=YOUR_KEY");
+        card.innerHTML = `
+          <div class="flex items-start gap-3 mb-2">
+            <span class="method-badge method-${e.method.toLowerCase()}">${e.method}</span>
+            <code class="mono text-sm text-slate-300 flex-1 break-all">${e.path}</code>
+          </div>
+          <p class="text-sm text-slate-400 mb-3">${e.desc}</p>
+          ${e.params.length ? `
+            <div class="mb-3">
+              <div class="text-xs font-bold text-slate-400 mb-1">Parameters:</div>
+              <ul class="text-xs space-y-1">
+                ${e.params.map(p => `<li class="flex gap-2">
+                  <code class="mono text-indigo-300">${p.name}</code>
+                  <span class="${p.required ? 'text-red-400' : 'text-slate-500'} text-xs">${p.required ? 'required' : 'optional'}</span>
+                  <span class="text-slate-400">— ${p.desc}</span>
+                </li>`).join("")}
+              </ul>
+            </div>
+          ` : ""}
+          <details class="text-xs">
+            <summary class="cursor-pointer text-slate-400 hover:text-slate-300">Example request</summary>
+            <pre class="bg-slate-900/50 p-2 rounded mt-2 mono overflow-x-auto"><code>curl "${exampleUrl}"</code></pre>
+          </details>
+        `;
+        container.appendChild(card);
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "habibi-rest-api",
+  "version": "1.0.0",
+  "description": "Personal REST API service with apikey auth, rate limit, dashboard. Inspired by autoresbot/lolhuman.",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "axios": "^1.7.7",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "jsonwebtoken": "^9.0.2",
+    "qrcode": "^1.5.4"
+  }
+}
