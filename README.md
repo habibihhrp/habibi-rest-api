@@ -11,24 +11,19 @@ Personal REST API service inspired by autoresbot/lolhuman — siap deploy ke Ver
 - 📝 **Request logging** — usage history per apikey
 - 🌐 **Dashboard frontend** (Tailwind + vanilla JS, no build step)
 
-## Endpoints (10+)
+## Endpoints (50+ — 7 kategori)
 
-| Endpoint | Description |
-|---|---|
-| `GET /api/downloader/tiktok` | Download TikTok video tanpa watermark |
-| `GET /api/downloader/instagram` | Download IG post/reel/story |
-| `GET /api/downloader/youtube` | Download YouTube video |
-| `GET /api/tools/brat` | Brat-style sticker (PNG) |
-| `GET /api/tools/ssweb` | Screenshot website (JPEG) |
-| `GET /api/tools/qrcode` | QR code generator (PNG) |
-| `GET /api/search/github` | Search GitHub repositories |
-| `GET /api/search/wikipedia` | Wikipedia summary (multi-lang) |
-| `GET /api/ai/chat` | AI chat via Groq Llama 3.3 70B |
-| `GET /api/random/quote` | Random quote (ID) |
-| `GET /api/random/waifu` | Random anime image (40+ kategori) |
-| `GET /api/random/fact` | Random fact (EN) |
+| Kategori | Jumlah | Endpoints |
+|---|---|---|
+| 📥 Downloader | 10 | tiktok, instagram, youtube, ytmp4, ytmp3, facebook, twitter, threads, mediafire, spotify |
+| 🤖 AI | 5 | chat (Groq Llama), gemini, imagine (Pollinations), tts (Google TTS), translate |
+| 🛠️ Tools | 12 | brat, ssweb, qrcode, nulis, shorturl, base64, hash, iplookup, weather, color, uuid, password |
+| 🔍 Search | 8 | github, wikipedia, npm, lirik, kbbi (Wiktionary), google, pinterest, tiktok |
+| 🎲 Random | 11 | quote, fact, joke, gombal, katabijak, dilan, fakta-id, waifu, dog, cat, meme |
+| 👀 Stalk | 3 | github, instagram, tiktok user profiles |
+| 🕌 Islam | 4 | jadwal-sholat, asmaul-husna, surah, hadits |
 
-Full docs di `/docs.html` setelah deploy.
+Full live-tester docs di `/docs.html` setelah deploy.
 
 ## Quick Start (Local Dev)
 
@@ -117,11 +112,13 @@ habibi-rest-api/
 ├── routes/
 │   ├── auth.js            # register, login, me, rotate-apikey
 │   ├── admin.js           # list users, upgrade plan, set role
-│   ├── downloader.js      # tiktok, instagram, youtube
-│   ├── tools.js           # brat, ssweb, qrcode
-│   ├── search.js          # github, wikipedia
-│   ├── ai.js              # chat (Groq proxy)
-│   └── random.js          # quote, waifu, fact
+│   ├── downloader.js      # 10 endpoints (tiktok, ig, yt, fb, twitter, ...)
+│   ├── tools.js           # 12 utility endpoints (brat, qrcode, hash, weather, ...)
+│   ├── search.js          # 8 search endpoints (github, npm, lirik, kbbi, ...)
+│   ├── ai.js              # 5 AI endpoints (chat, gemini, imagine, tts, translate)
+│   ├── random.js          # 11 random endpoints (quote, joke, gombal, ...)
+│   ├── stalk.js           # 3 profile-stalk endpoints (gh, ig, tt)
+│   └── islam.js           # 4 islamic endpoints (jadwal sholat, surah, ...)
 └── public/
     ├── index.html         # Landing page
     ├── login.html

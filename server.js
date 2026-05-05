@@ -14,6 +14,8 @@ import toolsRoutes from "./routes/tools.js";
 import searchRoutes from "./routes/search.js";
 import aiRoutes from "./routes/ai.js";
 import randomRoutes from "./routes/random.js";
+import stalkRoutes from "./routes/stalk.js";
+import islamRoutes from "./routes/islam.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -40,6 +42,8 @@ app.use("/api/tools", toolsRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/random", randomRoutes);
+app.use("/api/stalk", stalkRoutes);
+app.use("/api/islam", islamRoutes);
 
 // Static dashboard
 app.use(express.static(path.join(__dirname, "public")));
