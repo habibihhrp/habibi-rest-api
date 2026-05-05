@@ -17,6 +17,7 @@ const router = express.Router();
 // don't depend on outbound CDN at request time (and Vercel functions can read repo files).
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TWEMOJI_DIR = path.join(__dirname, "..", "assets", "twemoji");
+const FONT_DIR = path.join(__dirname, "..", "assets", "fonts");
 const loadEmojiDataUri = (filename) => {
   try {
     const buf = fs.readFileSync(path.join(TWEMOJI_DIR, filename));
@@ -25,6 +26,18 @@ const loadEmojiDataUri = (filename) => {
     return null;
   }
 };
+// Vercel serverless has no system fonts; bundle TTFs and pass to resvg explicitly
+// so text renders correctly in the IQC PNG output.
+const FONT_FILES = (() => {
+  try {
+    return fs
+      .readdirSync(FONT_DIR)
+      .filter((f) => /\.(ttf|otf)$/i.test(f))
+      .map((f) => path.join(FONT_DIR, f));
+  } catch {
+    return [];
+  }
+})();
 const EMOJI = {
   thumbs: loadEmojiDataUri("1f44d.png"),
   heart: loadEmojiDataUri("2764.png"),
@@ -573,8 +586,18 @@ router.get(
       res.setHeader("Cache-Control", "public, max-age=300");
       return res.send(svg);
     }
-    // Render to PNG via resvg (Rust-based, fast, no system dep on Vercel).
-    const png = new Resvg(svg, { background: "#000" }).render().asPng();
+    // Render to PNG via resvg (Rust-based, fast). Pass bundled TTFs explicitly
+    // because Vercel serverless has no system fonts.
+    const png = new Resvg(svg, {
+      background: "#000",
+      font: {
+        loadSystemFonts: false,
+        fontFiles: FONT_FILES,
+        defaultFontFamily: "Liberation Sans",
+      },
+    })
+      .render()
+      .asPng();
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Cache-Control", "public, max-age=300");
     return res.send(png);
