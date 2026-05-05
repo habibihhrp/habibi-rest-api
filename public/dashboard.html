@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Habibi API</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="glass sticky top-0 z-40 border-b border-slate-700/50">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+        ⚡ Habibi API
+      </a>
+      <div class="flex gap-2 items-center">
+        <a href="/docs.html" class="px-3 py-2 text-sm text-slate-300 hover:text-white">Docs</a>
+        <a href="/dashboard.html" class="px-3 py-2 text-sm text-white">Dashboard</a>
+        <span id="adminLink" class="hidden">
+          <a href="/admin.html" class="px-3 py-2 text-sm text-amber-400 hover:text-amber-300">Admin</a>
+        </span>
+        <button id="logoutBtn" class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium text-white">
+          Logout
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-6">
+    <div id="loading" class="text-center text-slate-400 py-12">Loading...</div>
+
+    <div id="content" class="hidden space-y-6">
+      <!-- Welcome -->
+      <div>
+        <h1 class="text-3xl font-bold">Halo, <span id="username"></span> 👋</h1>
+        <p class="text-slate-400" id="userEmail"></p>
+      </div>
+
+      <!-- API Key card -->
+      <div class="glass p-6 rounded-xl">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-bold text-lg">🔑 API Key</h2>
+          <span id="planBadge" class="px-3 py-1 rounded-full text-xs font-semibold"></span>
+        </div>
+        <div class="flex gap-2 items-center">
+          <code id="apikey" class="flex-1 mono text-sm bg-slate-900/50 px-4 py-3 rounded-lg overflow-x-auto"></code>
+          <button id="copyBtn" class="btn-secondary px-3 py-3 rounded-lg text-sm" title="Copy">📋</button>
+          <button id="rotateBtn" class="btn-secondary px-3 py-3 rounded-lg text-sm" title="Generate new key">🔄</button>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">Pakai sebagai query <code>?apikey=...</code> atau header <code>X-API-Key</code>.</p>
+      </div>
+
+      <!-- Stats grid -->
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="glass p-5 rounded-xl">
+          <div class="text-sm text-slate-400">Used Today</div>
+          <div class="text-3xl font-bold mt-1" id="usedToday">-</div>
+          <div class="text-xs text-slate-500 mt-1">Reset 00:00 WIB</div>
+        </div>
+        <div class="glass p-5 rounded-xl">
+          <div class="text-sm text-slate-400">Daily Limit</div>
+          <div class="text-3xl font-bold mt-1" id="dailyLimit">-</div>
+          <div class="text-xs text-slate-500 mt-1" id="planLabel">free plan</div>
+        </div>
+        <div class="glass p-5 rounded-xl">
+          <div class="text-sm text-slate-400">Expiry</div>
+          <div class="text-xl font-bold mt-1" id="expiry">-</div>
+          <div class="text-xs text-slate-500 mt-1">Premium plan only</div>
+        </div>
+      </div>
+
+      <!-- Recent Requests -->
+      <div class="glass p-6 rounded-xl">
+        <h2 class="font-bold text-lg mb-3">📋 Recent Requests</h2>
+        <div id="logsContainer" class="space-y-1 text-sm font-mono"></div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { api, toast, requireLogin, fmtTime, copyToClipboard } from "/js/app.js";
+    if (!requireLogin()) throw new Error("redirected");
+
+    const $ = (id) => document.getElementById(id);
+
+    const load = async () => {
+      try {
+        const r = await api.get("/api/auth/me");
+        const d = r.result;
+
+        $("username").textContent = d.user.username;
+        $("userEmail").textContent = d.user.email;
+        $("apikey").textContent = d.apikey || "(no apikey)";
+        $("usedToday").textContent = d.used_today;
+
+        const limit = d.plan === "premium" ? "Unlimited" : "100";
+        $("dailyLimit").textContent = limit;
+        $("planLabel").textContent = `${d.plan} plan`;
+
+        const badge = $("planBadge");
+        if (d.plan === "premium") {
+          badge.className = "px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white";
+          badge.textContent = "★ PREMIUM";
+        } else {
+          badge.className = "px-3 py-1 rounded-full text-xs font-semibold bg-slate-700 text-slate-300";
+          badge.textContent = "FREE";
+        }
+
+        $("expiry").textContent = d.expiry ? fmtTime(d.expiry) : "—";
+
+        if (d.user.role === "admin") $("adminLink").classList.remove("hidden");
+
+        const logsEl = $("logsContainer");
+        logsEl.innerHTML = "";
+        if (d.recent_logs.length === 0) {
+          logsEl.innerHTML = '<div class="text-slate-500 text-sm font-sans">Belum ada request. Coba pakai apikey kamu.</div>';
+        } else {
+          for (const log of d.recent_logs.slice(0, 20)) {
+            const row = document.createElement("div");
+            row.className = "flex justify-between gap-3 py-1 border-b border-slate-800/50";
+            const statusColor = log.status >= 400 ? "text-red-400" : "text-emerald-400";
+            row.innerHTML = `
+              <span class="${statusColor}">${log.status}</span>
+              <span class="flex-1 truncate text-slate-300">${log.endpoint}</span>
+              <span class="text-slate-500 text-xs">${fmtTime(log.timestamp)}</span>
+            `;
+            logsEl.appendChild(row);
+          }
+        }
+
+        $("loading").classList.add("hidden");
+        $("content").classList.remove("hidden");
+      } catch (err) {
+        if (err.message.includes("token") || err.message.includes("Unauthorized")) {
+          api.clearToken();
+          location.href = "/login.html";
+        } else {
+          toast(err.message, "error");
+        }
+      }
+    };
+
+    $("copyBtn").addEventListener("click", () => copyToClipboard($("apikey").textContent));
+
+    $("rotateBtn").addEventListener("click", async () => {
+      if (!confirm("Generate new apikey? Yang lama akan invalid.")) return;
+      try {
+        const r = await api.post("/api/auth/rotate-apikey", {});
+        $("apikey").textContent = r.result.apikey;
+        toast("API key rotated.", "success");
+      } catch (err) {
+        toast(err.message, "error");
+      }
+    });
+
+    $("logoutBtn").addEventListener("click", () => {
+      api.clearToken();
+      location.href = "/";
+    });
+
+    load();
+  </script>
+</body>
+</html>
