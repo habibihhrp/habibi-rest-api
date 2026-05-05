@@ -20,16 +20,25 @@
     </div>
   </nav>
 
-  <main class="max-w-4xl mx-auto px-4 py-8 space-y-6">
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-6">
     <div>
-      <h1 class="text-3xl font-bold mb-2">Dokumentasi API</h1>
-      <p class="text-slate-400">Daftar lengkap endpoint, parameter, dan contoh response.</p>
+      <h1 class="text-3xl md:text-4xl font-bold mb-2">Dokumentasi API</h1>
+      <p class="text-slate-400">Daftar lengkap endpoint dengan live tester. Klik <strong>Try it</strong> untuk uji langsung dari browser.</p>
     </div>
+
+    <!-- API key bar -->
+    <section class="glass rounded-xl p-4 flex flex-col md:flex-row gap-3 md:items-center">
+      <span class="text-sm text-slate-400 shrink-0">API key untuk Try it:</span>
+      <input id="apikeyInput" type="text" placeholder="Paste apikey kamu, atau login dulu di /dashboard"
+             class="input flex-1 px-3 py-2 rounded-lg text-sm mono" />
+      <button id="saveKeyBtn" class="btn-secondary px-4 py-2 rounded-lg text-sm">Simpan</button>
+      <a href="/register.html" class="btn px-4 py-2 rounded-lg text-sm text-center">Daftar</a>
+    </section>
 
     <!-- Authentication -->
     <section class="glass rounded-xl p-6">
       <h2 class="text-xl font-bold mb-3">🔐 Authentication</h2>
-      <p class="text-slate-300 mb-3">Pakai apikey kamu di setiap request. Dua cara:</p>
+      <p class="text-slate-300 mb-3">Pakai apikey kamu di setiap request — dua cara:</p>
       <pre class="bg-slate-900/50 p-3 rounded text-xs overflow-x-auto mono"><code># Sebagai query parameter
 curl "https://api.kamu.com/api/random/quote?apikey=YOUR_KEY"
 
@@ -59,115 +68,415 @@ curl -H "X-API-Key: YOUR_KEY" "https://api.kamu.com/api/random/quote"</code></pr
 }</code></pre>
         </div>
       </div>
+      <p class="text-xs text-slate-500 mt-3">
+        Beberapa endpoint (qrcode, brat, ssweb, imagine, tts, nulis) langsung mengembalikan binary
+        (image/audio), bukan JSON. Tinggal embed URL-nya di <code>&lt;img&gt;</code>/<code>&lt;audio&gt;</code>.
+      </p>
+    </section>
+
+    <!-- Search + filter -->
+    <section class="sticky top-16 z-30 -mx-4 px-4 py-3 bg-slate-900/80 backdrop-blur-sm border-y border-slate-700/40">
+      <div class="max-w-6xl mx-auto flex flex-col md:flex-row gap-3">
+        <input id="searchBox" type="text" placeholder="🔍 Cari endpoint... (mis: tiktok, ai, weather)"
+               class="input flex-1 px-4 py-2 rounded-lg text-sm" />
+        <div id="catFilters" class="flex flex-wrap gap-2 text-xs"></div>
+      </div>
+      <div id="counter" class="text-xs text-slate-500 mt-2"></div>
     </section>
 
     <!-- Endpoints -->
     <section>
-      <h2 class="text-2xl font-bold mb-4">📡 Endpoints</h2>
-      <div id="endpoints" class="space-y-3"></div>
+      <div id="endpoints" class="space-y-4"></div>
     </section>
   </main>
 
-  <script>
+  <script type="module">
+    import { copyToClipboard, toast } from "/js/app.js";
+
+    // Restore stored apikey
+    const TOKEN_KEY = "habibi_jwt";
+    const APIKEY_KEY = "habibi_apikey";
+    const apikeyInput = document.getElementById("apikeyInput");
+    apikeyInput.value = localStorage.getItem(APIKEY_KEY) || "";
+
+    document.getElementById("saveKeyBtn").addEventListener("click", () => {
+      localStorage.setItem(APIKEY_KEY, apikeyInput.value.trim());
+      toast("API key tersimpan di browser", "success");
+    });
+
+    // If logged in, auto-fetch apikey from /api/auth/me
+    const jwt = localStorage.getItem(TOKEN_KEY);
+    if (jwt && !apikeyInput.value) {
+      fetch("/api/auth/me", { headers: { Authorization: `Bearer ${jwt}` } })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.result?.apikey) {
+            apikeyInput.value = d.result.apikey;
+            localStorage.setItem(APIKEY_KEY, d.result.apikey);
+          }
+        })
+        .catch(() => {});
+    }
+
+    // ===== Endpoint catalog (static, generated from routes/*.js) =====
     const ENDPOINTS = [
-      // Downloader
-      { method: "GET", path: "/api/downloader/tiktok", category: "Downloader",
-        params: [{name: "url", required: true, desc: "TikTok video URL"}],
-        example: "https://www.tiktok.com/@user/video/123",
-        desc: "Download TikTok video tanpa watermark. Returns mp4 URL + metadata." },
-      { method: "GET", path: "/api/downloader/instagram", category: "Downloader",
-        params: [{name: "url", required: true, desc: "IG post/reel URL"}],
-        example: "https://www.instagram.com/reel/...",
-        desc: "Download Instagram post/reel/story." },
-      { method: "GET", path: "/api/downloader/youtube", category: "Downloader",
-        params: [{name: "url", required: true, desc: "YouTube video URL"}],
-        example: "https://youtu.be/dQw4w9WgXcQ",
-        desc: "Download YouTube video (mp4, 720p)." },
-      // Tools
-      { method: "GET", path: "/api/tools/brat", category: "Tools",
-        params: [{name: "text", required: true, desc: "Teks (max 200 chars)"}],
-        example: "habibi forever",
-        desc: "Generate Brat-style sticker. Returns PNG image (binary)." },
-      { method: "GET", path: "/api/tools/ssweb", category: "Tools",
-        params: [{name: "url", required: true, desc: "URL website (must start http://)"}],
-        example: "https://github.com",
-        desc: "Screenshot website. Returns JPEG image." },
-      { method: "GET", path: "/api/tools/qrcode", category: "Tools",
-        params: [{name: "text", required: true, desc: "Teks/URL untuk encode"}],
-        example: "https://habibi.com",
-        desc: "Generate QR code 512x512. Returns PNG image." },
-      // Search
-      { method: "GET", path: "/api/search/github", category: "Search",
-        params: [{name: "q", required: true, desc: "Search query"}],
-        example: "express middleware",
-        desc: "Search GitHub repositories. Returns top 10 by stars." },
-      { method: "GET", path: "/api/search/wikipedia", category: "Search",
-        params: [{name: "q", required: true, desc: "Article title"}, {name: "lang", required: false, desc: "Language code (default: id)"}],
-        example: "Indonesia",
-        desc: "Get Wikipedia summary." },
-      // AI
-      { method: "GET", path: "/api/ai/chat", category: "AI",
-        params: [
-          {name: "prompt", required: true, desc: "User prompt"},
-          {name: "system", required: false, desc: "System prompt (override)"},
-          {name: "model", required: false, desc: "Groq model (default: llama-3.3-70b)"},
-        ],
-        example: "Apa itu REST API?",
-        desc: "AI chat completion via Groq (Llama 3.3 70B). Free tier." },
-      // Random
-      { method: "GET", path: "/api/random/quote", category: "Random",
-        params: [], desc: "Random quote bahasa Indonesia." },
-      { method: "GET", path: "/api/random/waifu", category: "Random",
-        params: [{name: "category", required: false, desc: "waifu | neko | hug | kiss | etc"}],
-        example: "neko",
-        desc: "Random anime image (SFW)." },
-      { method: "GET", path: "/api/random/fact", category: "Random",
-        params: [], desc: "Random useless fact (English)." },
+      // ===== Downloader =====
+      { cat: "Downloader", emoji: "📥", path: "/api/downloader/tiktok",
+        params: [{n:"url",req:true,desc:"TikTok video URL",ex:"https://vt.tiktok.com/ZSjpdrh65/"}],
+        desc: "Download TikTok video tanpa watermark + metadata. JSON." },
+      { cat: "Downloader", emoji: "📥", path: "/api/downloader/instagram",
+        params: [{n:"url",req:true,desc:"IG post/reel/story URL",ex:"https://www.instagram.com/reel/CtBR8j0AXLU/"}],
+        desc: "Download IG post/reel. Best-effort (IG sering rate-limit)." },
+      { cat: "Downloader", emoji: "📥", path: "/api/downloader/youtube",
+        params: [{n:"url",req:true,desc:"YouTube video URL",ex:"https://youtu.be/dQw4w9WgXcQ"}],
+        desc: "Download YouTube (mp4 720p default) + metadata." },
+      { cat: "Downloader", emoji: "📥", path: "/api/downloader/ytmp4",
+        params: [{n:"url",req:true,desc:"YouTube URL",ex:"https://youtu.be/dQw4w9WgXcQ"},
+                 {n:"quality",req:false,desc:"144|240|360|480|720|1080 (default 720)",ex:"720"}],
+        desc: "YouTube to MP4 dengan pilihan quality." },
+      { cat: "Downloader", emoji: "📥", path: "/api/downloader/ytmp3",
+        params: [{n:"url",req:true,desc:"YouTube URL",ex:"https://youtu.be/dQw4w9WgXcQ"}],
+        desc: "YouTube to MP3 (audio only)." },
+      { cat: "Downloader", emoji: "📥", path: "/api/downloader/facebook",
+        params: [{n:"url",req:true,desc:"facebook.com / fb.watch URL",ex:"https://www.facebook.com/watch/?v=0000"}],
+        desc: "Download Facebook video." },
+      { cat: "Downloader", emoji: "📥", path: "/api/downloader/twitter",
+        params: [{n:"url",req:true,desc:"twitter.com / x.com status URL",ex:"https://x.com/Twitter/status/1604617643973124097"}],
+        desc: "Twitter/X tweet metadata + media URLs (via fxtwitter)." },
+      { cat: "Downloader", emoji: "📥", path: "/api/downloader/threads",
+        params: [{n:"url",req:true,desc:"threads.net post URL",ex:"https://www.threads.net/@instagram/post/0000"}],
+        desc: "Download Threads post media." },
+      { cat: "Downloader", emoji: "📥", path: "/api/downloader/mediafire",
+        params: [{n:"url",req:true,desc:"mediafire.com link",ex:"https://www.mediafire.com/file/example/file.zip/file"}],
+        desc: "Get direct download link from MediaFire share page." },
+      { cat: "Downloader", emoji: "📥", path: "/api/downloader/spotify",
+        params: [{n:"url",req:true,desc:"open.spotify.com link",ex:"https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT"}],
+        desc: "Spotify track metadata (TOS forbids audio scrape — metadata only)." },
+      { cat: "Downloader", emoji: "📥", path: "/api/downloader/play",
+        params: [{n:"q",req:true,desc:"Judul lagu / keyword YouTube",ex:"mahalini sisa rasa"}],
+        desc: "Cari YouTube + langsung dapet download URL mp3 (top result + 5 related)." },
+      { cat: "Downloader", emoji: "📥", path: "/api/downloader/ytsearch",
+        params: [{n:"q",req:true,desc:"YouTube search query",ex:"lo-fi study music"}],
+        desc: "YouTube search top 10 (videoId, title, channel, duration, thumbnail)." },
+
+      // ===== AI =====
+      { cat: "AI", emoji: "🤖", path: "/api/ai/chat",
+        params: [{n:"prompt",req:true,desc:"User prompt",ex:"Apa itu REST API?"},
+                 {n:"system",req:false,desc:"System prompt override"},
+                 {n:"model",req:false,desc:"Groq model (default llama-3.3-70b)"}],
+        desc: "Chat completion via Groq Llama 3.3 70B (super fast)." },
+      { cat: "AI", emoji: "🤖", path: "/api/ai/gemini",
+        params: [{n:"prompt",req:true,desc:"User prompt",ex:"Tulis pantun lucu"},
+                 {n:"model",req:false,desc:"Gemini model (default 2.0-flash)"}],
+        desc: "Google Gemini text completion (set GEMINI_API_KEY di env)." },
+      { cat: "AI", emoji: "🤖", path: "/api/ai/imagine", binary: "image/png",
+        params: [{n:"prompt",req:true,desc:"Image prompt",ex:"a cyberpunk cat in jakarta at night"},
+                 {n:"width",req:false,desc:"256-1536 (default 768)"},
+                 {n:"height",req:false,desc:"256-1536 (default 768)"},
+                 {n:"seed",req:false,desc:"Reproducible seed"}],
+        desc: "Generate AI image (Pollinations free). Returns PNG." },
+      { cat: "AI", emoji: "🤖", path: "/api/ai/tts", binary: "audio/mpeg",
+        params: [{n:"text",req:true,desc:"Teks (max 500)",ex:"Halo, ini Habibi API"},
+                 {n:"lang",req:false,desc:"Kode bahasa ISO (default id)"}],
+        desc: "Text-to-speech via Google Translate. Returns MP3." },
+      { cat: "AI", emoji: "🤖", path: "/api/ai/translate",
+        params: [{n:"text",req:true,desc:"Teks (max 5000)",ex:"halo apa kabar"},
+                 {n:"to",req:false,desc:"Target lang ISO (default en)"},
+                 {n:"from",req:false,desc:"Source lang (default auto)"}],
+        desc: "Auto-detect + translate via Google Translate." },
+
+      // ===== Tools =====
+      { cat: "Tools", emoji: "🛠️", path: "/api/tools/brat", binary: "image/png",
+        params: [{n:"text",req:true,desc:"Text (max 200)",ex:"habibi forever"}],
+        desc: "Brat-style sticker (white text on black). PNG." },
+      { cat: "Tools", emoji: "🛠️", path: "/api/tools/ssweb", binary: "image/jpeg",
+        params: [{n:"url",req:true,desc:"URL (must start http://)",ex:"https://github.com"}],
+        desc: "Screenshot website. JPEG." },
+      { cat: "Tools", emoji: "🛠️", path: "/api/tools/qrcode", binary: "image/png",
+        params: [{n:"text",req:true,desc:"Text/URL to encode",ex:"https://habibi.dev"}],
+        desc: "Generate QR code 512x512 PNG." },
+      { cat: "Tools", emoji: "🛠️", path: "/api/tools/nulis", binary: "image/png",
+        params: [{n:"text",req:true,desc:"Text (max 500)",ex:"habibi belajar coding"}],
+        desc: "Tulisan tangan di kertas bergaris. PNG." },
+      { cat: "Tools", emoji: "🛠️", path: "/api/tools/shorturl",
+        params: [{n:"url",req:true,desc:"URL to shorten",ex:"https://github.com/habibihhrp"}],
+        desc: "URL shortener via is.gd (free, GDPR-friendly)." },
+      { cat: "Tools", emoji: "🛠️", path: "/api/tools/base64",
+        params: [{n:"text",req:true,desc:"Input text",ex:"halo habibi"},
+                 {n:"action",req:false,desc:"encode|decode (default encode)"}],
+        desc: "Base64 encode/decode utility." },
+      { cat: "Tools", emoji: "🛠️", path: "/api/tools/hash",
+        params: [{n:"text",req:true,desc:"Input text",ex:"hello"},
+                 {n:"algo",req:false,desc:"md5|sha1|sha256|sha512 (default md5)"}],
+        desc: "Compute crypto hash." },
+      { cat: "Tools", emoji: "🛠️", path: "/api/tools/iplookup",
+        params: [{n:"ip",req:true,desc:"IP address",ex:"8.8.8.8"}],
+        desc: "GeoIP lookup via ip-api.com." },
+      { cat: "Tools", emoji: "🛠️", path: "/api/tools/weather",
+        params: [{n:"city",req:true,desc:"City name",ex:"Jakarta"}],
+        desc: "Current weather via wttr.in." },
+      { cat: "Tools", emoji: "🛠️", path: "/api/tools/color",
+        params: [{n:"hex",req:true,desc:"6-digit hex color",ex:"ff8800"}],
+        desc: "RGB/HSL/complement + swatch URL." },
+      { cat: "Tools", emoji: "🛠️", path: "/api/tools/uuid",
+        params: [],
+        desc: "Generate random UUID v4." },
+      { cat: "Tools", emoji: "🛠️", path: "/api/tools/password",
+        params: [{n:"length",req:false,desc:"4-128 (default 16)"},
+                 {n:"symbols",req:false,desc:"true|false (default true)"}],
+        desc: "Strong random password generator." },
+      { cat: "Tools", emoji: "🛠️", path: "/api/tools/iqc",
+        params: [{n:"text",req:true,desc:"Isi pesan (max 200 char)",ex:"halo"},
+                 {n:"operator",req:false,desc:"Telkomsel|XL|Indosat|Smartfren (default Telkomsel)",ex:"XL"},
+                 {n:"network",req:false,desc:"LTE|4G|5G|3G (default LTE)",ex:"5G"},
+                 {n:"time",req:false,desc:"Jam status bar (default 07.58)",ex:"21.30"},
+                 {n:"battery",req:false,desc:"0-100 (default 28)",ex:"92"},
+                 {n:"signal",req:false,desc:"Bars 0-4 (default 4)",ex:"3"},
+                 {n:"wifi",req:false,desc:"on|off (default on)",ex:"on"},
+                 {n:"wifiBars",req:false,desc:"0-3 (default 3)",ex:"2"}],
+        desc: "IQC Generator — iOS WhatsApp long-press template (status bar + reaction bar 👍❤️😂😮😢🙏 + action sheet Beri Bintang/Balas/Teruskan/Salin/Ucapkan/Laporkan/Hapus). Output image/svg+xml." },
+
+      // ===== Search =====
+      { cat: "Search", emoji: "🔍", path: "/api/search/github",
+        params: [{n:"q",req:true,desc:"Search query",ex:"express middleware"}],
+        desc: "Top 10 GitHub repos by stars." },
+      { cat: "Search", emoji: "🔍", path: "/api/search/wikipedia",
+        params: [{n:"q",req:true,desc:"Article title",ex:"Indonesia"},
+                 {n:"lang",req:false,desc:"Language code (default id)"}],
+        desc: "Wikipedia article summary." },
+      { cat: "Search", emoji: "🔍", path: "/api/search/npm",
+        params: [{n:"q",req:true,desc:"Package query",ex:"react"}],
+        desc: "Search npm registry (top 10)." },
+      { cat: "Search", emoji: "🔍", path: "/api/search/lirik",
+        params: [{n:"q",req:true,desc:"'penyanyi - judul'",ex:"Coldplay - Yellow"}],
+        desc: "Lyrics search via lyrics.ovh." },
+      { cat: "Search", emoji: "🔍", path: "/api/search/kbbi",
+        params: [{n:"q",req:true,desc:"Kata bahasa Indonesia",ex:"ngopi"}],
+        desc: "Definisi kata via Wiktionary ID." },
+      { cat: "Search", emoji: "🔍", path: "/api/search/google",
+        params: [{n:"q",req:true,desc:"Search query",ex:"devin ai"}],
+        desc: "Web search via DuckDuckGo HTML scrape." },
+      { cat: "Search", emoji: "🔍", path: "/api/search/pinterest",
+        params: [{n:"q",req:true,desc:"Search query",ex:"anime aesthetic"}],
+        desc: "Pinterest image search (best-effort)." },
+      { cat: "Search", emoji: "🔍", path: "/api/search/tiktok",
+        params: [{n:"q",req:true,desc:"Search query",ex:"lucu"}],
+        desc: "TikTok video search (top 10)." },
+
+      // ===== Random =====
+      { cat: "Random", emoji: "🎲", path: "/api/random/quote", params:[], desc:"Random quote bahasa Indonesia." },
+      { cat: "Random", emoji: "🎲", path: "/api/random/fact", params:[], desc:"Useless fact (English)." },
+      { cat: "Random", emoji: "🎲", path: "/api/random/joke", params:[], desc:"Random joke (English)." },
+      { cat: "Random", emoji: "🎲", path: "/api/random/gombal", params:[], desc:"Gombalan random (Indonesia)." },
+      { cat: "Random", emoji: "🎲", path: "/api/random/katabijak", params:[], desc:"Kata bijak random." },
+      { cat: "Random", emoji: "🎲", path: "/api/random/dilan", params:[], desc:"Quote Dilan random." },
+      { cat: "Random", emoji: "🎲", path: "/api/random/fakta-id", params:[], desc:"Fakta menarik tentang Indonesia." },
+      { cat: "Random", emoji: "🎲", path: "/api/random/waifu",
+        params: [{n:"category",req:false,desc:"neko|hug|kiss|wave|...",ex:"neko"}],
+        desc: "Random anime image (SFW). 30+ kategori." },
+      { cat: "Random", emoji: "🎲", path: "/api/random/dog", params:[], desc:"Random dog image." },
+      { cat: "Random", emoji: "🎲", path: "/api/random/cat", params:[], desc:"Random cat image." },
+      { cat: "Random", emoji: "🎲", path: "/api/random/meme", params:[], desc:"Random meme dari Reddit." },
+
+      // ===== Stalk =====
+      { cat: "Stalk", emoji: "👀", path: "/api/stalk/github",
+        params: [{n:"username",req:true,desc:"GitHub username",ex:"octocat"}],
+        desc: "Profile + stats GitHub user." },
+      { cat: "Stalk", emoji: "👀", path: "/api/stalk/tiktok",
+        params: [{n:"username",req:true,desc:"TikTok @username",ex:"charlidamelio"}],
+        desc: "Profile + followers TikTok user." },
+      { cat: "Stalk", emoji: "👀", path: "/api/stalk/instagram",
+        params: [{n:"username",req:true,desc:"IG @username",ex:"cristiano"}],
+        desc: "Profile IG user (best-effort, IG sering block)." },
+
+      // ===== Islam =====
+      { cat: "Islam", emoji: "🕌", path: "/api/islam/jadwal-sholat",
+        params: [{n:"city",req:false,desc:"Nama kota (default Jakarta)",ex:"Jakarta"},
+                 {n:"country",req:false,desc:"Default Indonesia"}],
+        desc: "Jadwal sholat hari ini (metode Kemenag RI)." },
+      { cat: "Islam", emoji: "🕌", path: "/api/islam/asmaul-husna",
+        params: [{n:"no",req:false,desc:"1-10 (kalau kosong = random)"}],
+        desc: "Asmaul Husna (subset 10 nama)." },
+      { cat: "Islam", emoji: "🕌", path: "/api/islam/surah",
+        params: [{n:"nomor",req:true,desc:"1-114",ex:"1"}],
+        desc: "Info surah Al-Quran (via equran.id)." },
+      { cat: "Islam", emoji: "🕌", path: "/api/islam/hadits",
+        params: [{n:"perawi",req:false,desc:"bukhari|muslim|tirmidzi|... (default bukhari)"},
+                 {n:"nomor",req:false,desc:"Default 1"}],
+        desc: "Hadits dari kitab perawi tertentu." },
     ];
 
+    // ===== Render =====
     const grouped = {};
     for (const e of ENDPOINTS) {
-      grouped[e.category] = grouped[e.category] || [];
-      grouped[e.category].push(e);
+      (grouped[e.cat] = grouped[e.cat] || []).push(e);
     }
+    const allCats = Object.keys(grouped);
+
+    const counterEl = document.getElementById("counter");
+    const updateCounter = (visible) => {
+      counterEl.textContent = `Menampilkan ${visible} dari ${ENDPOINTS.length} endpoint`;
+    };
+    updateCounter(ENDPOINTS.length);
+
+    // Category filter pills
+    const filtersEl = document.getElementById("catFilters");
+    const allBtn = document.createElement("button");
+    allBtn.textContent = `All (${ENDPOINTS.length})`;
+    allBtn.dataset.cat = "_all";
+    allBtn.className = "cat-pill cat-pill-active px-3 py-1 rounded-full bg-indigo-600 text-white";
+    filtersEl.appendChild(allBtn);
+    for (const cat of allCats) {
+      const btn = document.createElement("button");
+      btn.textContent = `${grouped[cat][0].emoji} ${cat} (${grouped[cat].length})`;
+      btn.dataset.cat = cat;
+      btn.className = "cat-pill px-3 py-1 rounded-full bg-slate-700 text-slate-300 hover:bg-slate-600";
+      filtersEl.appendChild(btn);
+    }
+
+    let activeCat = "_all";
+    let searchTerm = "";
+
+    const renderCard = (e) => {
+      const card = document.createElement("div");
+      card.className = "endpoint-card glass rounded-xl p-4 border border-slate-700/50";
+      card.dataset.cat = e.cat;
+      card.dataset.search = `${e.path} ${e.desc} ${e.cat}`.toLowerCase();
+      const reqParams = e.params.filter((p) => p.req).map((p) => `${p.n}=${encodeURIComponent(p.ex || "TODO")}`);
+      const exampleQs = ["apikey=YOUR_KEY", ...reqParams].join("&");
+      const exampleUrl = `${e.path}?${exampleQs}`;
+      const fullUrl = `${location.origin}${exampleUrl}`;
+      card.innerHTML = `
+        <div class="flex items-start gap-3 mb-2">
+          <span class="method-badge method-get">GET</span>
+          <code class="mono text-sm text-slate-300 flex-1 break-all">${e.path}</code>
+          <span class="text-xs text-slate-500">${e.cat}</span>
+        </div>
+        <p class="text-sm text-slate-400 mb-3">${e.desc}${e.binary ? ` <em class="text-amber-400">(returns ${e.binary})</em>` : ""}</p>
+        ${e.params.length ? `
+          <div class="mb-3">
+            <div class="text-xs font-bold text-slate-400 mb-1">Parameters:</div>
+            <ul class="text-xs space-y-1">
+              ${e.params.map((p) => `<li class="flex flex-wrap gap-2">
+                <code class="mono text-indigo-300">${p.n}</code>
+                <span class="${p.req ? "text-red-400" : "text-slate-500"} text-xs">${p.req ? "required" : "optional"}</span>
+                <span class="text-slate-400">— ${p.desc}</span>
+              </li>`).join("")}
+            </ul>
+          </div>` : ""}
+        <div class="flex flex-wrap gap-2">
+          <button class="copy-curl btn-secondary px-3 py-1.5 rounded-lg text-xs">📋 Copy curl</button>
+          <button class="try-it btn px-3 py-1.5 rounded-lg text-xs text-white">▶ Try it</button>
+          <a href="${exampleUrl}" target="_blank" rel="noopener"
+             class="btn-secondary px-3 py-1.5 rounded-lg text-xs">↗ Open in tab</a>
+        </div>
+        <div class="response-area mt-3 hidden">
+          <div class="text-xs font-bold text-slate-400 mb-1">Response:</div>
+          <div class="response-content"></div>
+        </div>
+      `;
+
+      const copyBtn = card.querySelector(".copy-curl");
+      copyBtn.addEventListener("click", () => {
+        const apikey = (apikeyInput.value || "YOUR_KEY").trim() || "YOUR_KEY";
+        const finalUrl = `${location.origin}${e.path}?${["apikey=" + apikey, ...reqParams].join("&")}`;
+        copyToClipboard(`curl "${finalUrl}"`);
+      });
+
+      const tryBtn = card.querySelector(".try-it");
+      const respArea = card.querySelector(".response-area");
+      const respContent = card.querySelector(".response-content");
+      tryBtn.addEventListener("click", async () => {
+        const apikey = (apikeyInput.value || "").trim();
+        if (!apikey) {
+          toast("Isi API key dulu di atas / login.", "error");
+          return;
+        }
+        respArea.classList.remove("hidden");
+        respContent.innerHTML = `<div class="text-slate-500 text-xs">Loading...</div>`;
+        const finalUrl = `${e.path}?${["apikey=" + encodeURIComponent(apikey), ...reqParams].join("&")}`;
+        const t0 = Date.now();
+        try {
+          const r = await fetch(finalUrl);
+          const ms = Date.now() - t0;
+          const ct = r.headers.get("content-type") || "";
+          const ok = r.ok;
+          if (ct.startsWith("image/")) {
+            const blob = await r.blob();
+            const url = URL.createObjectURL(blob);
+            respContent.innerHTML = `<img src="${url}" class="rounded-lg max-h-96 border border-slate-700/50" />
+              <div class="text-xs text-slate-500 mt-1">${r.status} · ${ct} · ${ms}ms</div>`;
+          } else if (ct.startsWith("audio/")) {
+            const blob = await r.blob();
+            const url = URL.createObjectURL(blob);
+            respContent.innerHTML = `<audio src="${url}" controls autoplay class="w-full"></audio>
+              <div class="text-xs text-slate-500 mt-1">${r.status} · ${ct} · ${ms}ms</div>`;
+          } else {
+            const txt = await r.text();
+            let pretty = txt;
+            try { pretty = JSON.stringify(JSON.parse(txt), null, 2); } catch {}
+            respContent.innerHTML = `<pre class="bg-slate-900/70 p-3 rounded-lg text-xs mono overflow-x-auto max-h-96">${pretty.replace(/[<>&]/g, (c) => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))}</pre>
+              <div class="text-xs ${ok ? "text-emerald-400" : "text-red-400"} mt-1">${r.status} · ${ct} · ${ms}ms</div>`;
+          }
+        } catch (err) {
+          respContent.innerHTML = `<div class="text-red-400 text-sm">Error: ${err.message}</div>`;
+        }
+      });
+
+      return card;
+    };
 
     const container = document.getElementById("endpoints");
-    for (const [cat, items] of Object.entries(grouped)) {
-      const heading = document.createElement("h3");
-      heading.className = "text-lg font-bold mt-6 mb-2 text-indigo-300";
-      heading.textContent = cat;
-      container.appendChild(heading);
+    const allCards = ENDPOINTS.map(renderCard);
+    let currentHeading = null;
 
-      for (const e of items) {
-        const card = document.createElement("div");
-        card.className = "endpoint-card glass rounded-xl p-4 border border-slate-700/50";
-        const exampleUrl = e.path + (e.params.length ? `?${e.params.filter(p => p.required || p.name === 'url' || p.name === 'text' || p.name === 'q' || p.name === 'prompt').map(p => `${p.name}=${encodeURIComponent(e.example || '')}`).join("&")}&apikey=YOUR_KEY` : "?apikey=YOUR_KEY");
-        card.innerHTML = `
-          <div class="flex items-start gap-3 mb-2">
-            <span class="method-badge method-${e.method.toLowerCase()}">${e.method}</span>
-            <code class="mono text-sm text-slate-300 flex-1 break-all">${e.path}</code>
-          </div>
-          <p class="text-sm text-slate-400 mb-3">${e.desc}</p>
-          ${e.params.length ? `
-            <div class="mb-3">
-              <div class="text-xs font-bold text-slate-400 mb-1">Parameters:</div>
-              <ul class="text-xs space-y-1">
-                ${e.params.map(p => `<li class="flex gap-2">
-                  <code class="mono text-indigo-300">${p.name}</code>
-                  <span class="${p.required ? 'text-red-400' : 'text-slate-500'} text-xs">${p.required ? 'required' : 'optional'}</span>
-                  <span class="text-slate-400">— ${p.desc}</span>
-                </li>`).join("")}
-              </ul>
-            </div>
-          ` : ""}
-          <details class="text-xs">
-            <summary class="cursor-pointer text-slate-400 hover:text-slate-300">Example request</summary>
-            <pre class="bg-slate-900/50 p-2 rounded mt-2 mono overflow-x-auto"><code>curl "${exampleUrl}"</code></pre>
-          </details>
-        `;
-        container.appendChild(card);
+    const renderList = () => {
+      container.innerHTML = "";
+      let visibleCount = 0;
+      let lastCat = null;
+      for (let i = 0; i < ENDPOINTS.length; i++) {
+        const e = ENDPOINTS[i];
+        const matchCat = activeCat === "_all" || e.cat === activeCat;
+        const matchSearch = !searchTerm || allCards[i].dataset.search.includes(searchTerm);
+        if (!matchCat || !matchSearch) continue;
+        if (e.cat !== lastCat) {
+          const heading = document.createElement("h3");
+          heading.className = "text-lg font-bold mt-6 mb-2 text-indigo-300 sticky top-32 bg-slate-900/90 backdrop-blur-sm py-1";
+          heading.innerHTML = `${e.emoji} ${e.cat}`;
+          container.appendChild(heading);
+          lastCat = e.cat;
+        }
+        container.appendChild(allCards[i]);
+        visibleCount++;
       }
-    }
+      if (visibleCount === 0) {
+        container.innerHTML = `<div class="text-center text-slate-500 py-12">Tidak ada endpoint yang cocok 🤔</div>`;
+      }
+      updateCounter(visibleCount);
+    };
+
+    document.getElementById("searchBox").addEventListener("input", (ev) => {
+      searchTerm = ev.target.value.toLowerCase().trim();
+      renderList();
+    });
+
+    filtersEl.addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".cat-pill");
+      if (!btn) return;
+      activeCat = btn.dataset.cat;
+      filtersEl.querySelectorAll(".cat-pill").forEach((b) => {
+        if (b === btn) {
+          b.classList.add("cat-pill-active", "bg-indigo-600", "text-white");
+          b.classList.remove("bg-slate-700", "text-slate-300", "hover:bg-slate-600");
+        } else {
+          b.classList.remove("cat-pill-active", "bg-indigo-600", "text-white");
+          b.classList.add("bg-slate-700", "text-slate-300", "hover:bg-slate-600");
+        }
+      });
+      renderList();
+    });
+
+    renderList();
   </script>
 </body>
 </html>

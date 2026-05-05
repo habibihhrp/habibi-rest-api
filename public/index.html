@@ -24,60 +24,99 @@
   </nav>
 
   <section class="max-w-6xl mx-auto px-4 py-16 md:py-24 text-center">
+    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs mb-6">
+      <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+      50+ endpoint · live di production
+    </div>
     <h1 class="text-4xl md:text-6xl font-bold mb-6 leading-tight">
       <span class="bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 bg-clip-text text-transparent">
         REST API gratis
       </span>
       <br />
-      untuk semua fitur kamu
+      buat semua fitur kamu
     </h1>
     <p class="text-lg text-slate-400 max-w-2xl mx-auto mb-8">
-      Downloader · Tools · AI Chat · Search · Random — semua di satu apikey.
-      Daftar gratis, dapet 100 request/hari. Upgrade premium untuk unlimited.
+      Downloader · AI · Tools · Search · Random · Stalk · Islam — satu apikey untuk semuanya.
+      Daftar gratis dapet 100 request/hari. Upgrade premium untuk unlimited.
     </p>
     <div class="flex gap-3 justify-center flex-wrap">
       <a href="/register.html" class="btn px-6 py-3 rounded-lg font-medium text-white">
         Get API Key →
       </a>
       <a href="/docs.html" class="btn-secondary px-6 py-3 rounded-lg font-medium text-white">
-        Lihat Dokumentasi
+        Lihat 50+ Endpoint
       </a>
+    </div>
+
+    <!-- Stats row -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-12 max-w-3xl mx-auto">
+      <div class="glass rounded-xl p-4">
+        <div class="text-2xl font-bold text-indigo-300">50+</div>
+        <div class="text-xs text-slate-400 mt-1">Endpoint</div>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <div class="text-2xl font-bold text-purple-300">7</div>
+        <div class="text-xs text-slate-400 mt-1">Kategori</div>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <div class="text-2xl font-bold text-emerald-300">100</div>
+        <div class="text-xs text-slate-400 mt-1">Free /day</div>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <div class="text-2xl font-bold text-pink-300">∞</div>
+        <div class="text-xs text-slate-400 mt-1">Premium</div>
+      </div>
     </div>
   </section>
 
   <section class="max-w-6xl mx-auto px-4 pb-16">
-    <h2 class="text-2xl font-bold mb-6 text-center">Fitur</h2>
+    <h2 class="text-2xl font-bold mb-6 text-center">Kategori Lengkap</h2>
     <div class="grid md:grid-cols-3 gap-4">
-      <div class="glass p-6 rounded-xl">
+      <a href="/docs.html" class="glass p-6 rounded-xl hover:border-indigo-500/50 transition-colors">
         <div class="text-3xl mb-3">📥</div>
-        <h3 class="font-bold mb-2">Downloader</h3>
-        <p class="text-sm text-slate-400">TikTok, Instagram, YouTube — download video tanpa watermark, langsung mp4 URL.</p>
-      </div>
-      <div class="glass p-6 rounded-xl">
-        <div class="text-3xl mb-3">🛠️</div>
-        <h3 class="font-bold mb-2">Tools</h3>
-        <p class="text-sm text-slate-400">Brat sticker, screenshot website, QR code generator. Output langsung image.</p>
-      </div>
-      <div class="glass p-6 rounded-xl">
+        <h3 class="font-bold mb-1">Downloader <span class="text-xs text-slate-500">(12)</span></h3>
+        <p class="text-sm text-slate-400">TikTok, Instagram, YouTube (mp3/mp4), <strong>play (cari + dl mp3)</strong>, Facebook, Twitter, Threads, MediaFire, Spotify.</p>
+      </a>
+      <a href="/docs.html" class="glass p-6 rounded-xl hover:border-indigo-500/50 transition-colors">
         <div class="text-3xl mb-3">🤖</div>
-        <h3 class="font-bold mb-2">AI Chat</h3>
-        <p class="text-sm text-slate-400">Llama 3.3 70B via Groq (super fast). Chat completion endpoint mirip OpenAI.</p>
-      </div>
-      <div class="glass p-6 rounded-xl">
+        <h3 class="font-bold mb-1">AI <span class="text-xs text-slate-500">(5)</span></h3>
+        <p class="text-sm text-slate-400">Groq Llama 3.3, Google Gemini, image-gen, TTS, translate.</p>
+      </a>
+      <a href="/docs.html" class="glass p-6 rounded-xl hover:border-indigo-500/50 transition-colors">
+        <div class="text-3xl mb-3">🛠️</div>
+        <h3 class="font-bold mb-1">Tools <span class="text-xs text-slate-500">(13)</span></h3>
+        <p class="text-sm text-slate-400">Brat, screenshot, QR code, shorturl, hash, base64, weather, IP lookup, color, password, <strong>IQC iPhone chat</strong>.</p>
+      </a>
+      <a href="/docs.html" class="glass p-6 rounded-xl hover:border-indigo-500/50 transition-colors">
         <div class="text-3xl mb-3">🔍</div>
-        <h3 class="font-bold mb-2">Search</h3>
-        <p class="text-sm text-slate-400">GitHub repositories, Wikipedia summary. Multi-language support.</p>
-      </div>
-      <div class="glass p-6 rounded-xl">
+        <h3 class="font-bold mb-1">Search <span class="text-xs text-slate-500">(8)</span></h3>
+        <p class="text-sm text-slate-400">GitHub, Wikipedia, npm, lirik lagu, KBBI, Google, Pinterest, TikTok.</p>
+      </a>
+      <a href="/docs.html" class="glass p-6 rounded-xl hover:border-indigo-500/50 transition-colors">
         <div class="text-3xl mb-3">🎲</div>
-        <h3 class="font-bold mb-2">Random</h3>
-        <p class="text-sm text-slate-400">Quote of the day, waifu image (30+ kategori), fakta random.</p>
-      </div>
-      <div class="glass p-6 rounded-xl">
+        <h3 class="font-bold mb-1">Random <span class="text-xs text-slate-500">(11)</span></h3>
+        <p class="text-sm text-slate-400">Quote, fact, joke, gombal, kata bijak, Dilan, fakta-id, waifu, dog, cat, meme.</p>
+      </a>
+      <a href="/docs.html" class="glass p-6 rounded-xl hover:border-indigo-500/50 transition-colors">
+        <div class="text-3xl mb-3">👀</div>
+        <h3 class="font-bold mb-1">Stalk <span class="text-xs text-slate-500">(3)</span></h3>
+        <p class="text-sm text-slate-400">Profile + stats GitHub, Instagram, TikTok user.</p>
+      </a>
+      <a href="/docs.html" class="glass p-6 rounded-xl hover:border-indigo-500/50 transition-colors">
+        <div class="text-3xl mb-3">🕌</div>
+        <h3 class="font-bold mb-1">Islam <span class="text-xs text-slate-500">(4)</span></h3>
+        <p class="text-sm text-slate-400">Jadwal sholat (metode Kemenag), Asmaul Husna, surah Al-Quran, hadits.</p>
+      </a>
+      <a href="/dashboard.html" class="glass p-6 rounded-xl hover:border-indigo-500/50 transition-colors">
         <div class="text-3xl mb-3">📊</div>
-        <h3 class="font-bold mb-2">Dashboard</h3>
-        <p class="text-sm text-slate-400">Lihat usage harian, recent requests, rotate apikey, upgrade plan.</p>
-      </div>
+        <h3 class="font-bold mb-1">Dashboard</h3>
+        <p class="text-sm text-slate-400">Usage harian, recent requests, rotate apikey, upgrade plan.</p>
+      </a>
+      <a href="/admin.html" class="glass p-6 rounded-xl hover:border-amber-500/50 transition-colors">
+        <div class="text-3xl mb-3">⚙️</div>
+        <h3 class="font-bold mb-1">Admin <span class="text-xs text-amber-400">(role admin)</span></h3>
+        <p class="text-sm text-slate-400">Kelola user, set role, upgrade plan, atur expiry premium.</p>
+      </a>
     </div>
   </section>
 
