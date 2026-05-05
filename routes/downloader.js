@@ -115,8 +115,8 @@ router.get(
 const PIPED_INSTANCES = [
   process.env.PIPED_API_URL,
   "https://api.piped.private.coffee",
-  "https://pipedapi.kavin.rocks",
-  "https://pipedapi.adminforge.de",
+  "https://pipedapi.in.projectsegfau.lt",
+  "https://pipedapi.reallyaweso.me",
 ].filter(Boolean);
 
 const extractYtVideoId = (url) => {
@@ -132,11 +132,12 @@ const pipedFetch = async (path) => {
     try {
       const r = await axios.get(`${base}${path}`, {
         headers: { "User-Agent": UA, Accept: "application/json" },
-        timeout: 20000,
-        maxRedirects: 3,
+        timeout: 15000,
+        maxRedirects: 0,
+        validateStatus: (s) => s === 200,
       });
-      if (r.data && typeof r.data === "object") return r.data;
-      lastErr = new Error("Non-JSON response from " + base);
+      if (r.data && typeof r.data === "object" && !r.data.error) return r.data;
+      lastErr = new Error(r.data?.error || "Non-JSON response from " + base);
     } catch (e) {
       lastErr = e;
     }
@@ -446,7 +447,14 @@ router.get(
       }
       if (!audio_url) dlErr = "No audio stream returned by Piped";
     } catch (e) {
-      dlErr = e?.response?.data?.message || e?.message || "Piped fetch failed";
+      const raw = e?.response?.data?.message || e?.message || "Piped fetch failed";
+      // YT bot-detection often surfaces as 'LOGIN_REQUIRED' / 'Sign in to confirm'.
+      // Translate to a user-friendly message instead of raw stack trace.
+      if (/LOGIN_REQUIRED|Sign in to confirm/i.test(raw)) {
+        dlErr = "YouTube blocking anonymous fetch on this video (bot detection). Coba video lain atau set PIPED_API_URL ke instance self-hosted.";
+      } else {
+        dlErr = raw.slice(0, 200);
+      }
     }
     logSuccess(req);
     return ok(res, {
